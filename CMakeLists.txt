@@ -3,4 +3,4 @@ project(chatApp)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(chatApp main.cpp)
+add_executable(chatApp main.cpp server.h server.cpp)
