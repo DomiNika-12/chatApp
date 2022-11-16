@@ -1,4 +1,3 @@
-#include <cerrno>
 #include "client.h"
 
 Client::Client()
@@ -27,7 +26,6 @@ int Client::readUserInput(char** buffer)
         (*buffer)[i] = c;
         i++;
         c = fgetc(stdin);
-        //printf("%c", c);
     }
     if (i > iInitialSize)
     {
@@ -42,8 +40,9 @@ int Client::readUserInput(char** buffer)
 int Client::CreateConnection()
 {
     int iError = 0;
+    int iOpt = 0;
 
-    // Create socket: IPv4 domain, TCP, default protocol
+    // Create socket: IPv4 domain, TCP, TCP protocol
     iSocketFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (iSocketFd == -1)
     {
@@ -52,9 +51,9 @@ int Client::CreateConnection()
         return iError;
     }
 
-    int opt = 1;
-    setsockopt(iSocketFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
-//
+    iOpt = 1;
+    setsockopt(iSocketFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &iOpt, sizeof(iOpt));
+
     serv.sin_family = AF_INET;
     serv.sin_port = htons(PORT);
     serv.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -76,115 +75,9 @@ int Client::CreateConnection()
     return iError;
 }
 
-
-
-int Client::SendMsg(char* pcBuffer, int iMsgSize, IDHeader header)
-{
-    int iError = 0;
-    int iMsgSizeNBO = 0;
-    int iHeaderSize = 0;
-    int iHeaderSizeNBO = 0;
-
-    iHeaderSize = sizeof(header);
-    // Send self id
-    iHeaderSizeNBO = htonl(iMsgSize);
-    iError = write(iSocketFd, &iHeaderSizeNBO, 4);
-    if (iError < 0)
-    {
-        printf("Size message not sent, error (%d)\n", iError);
-        return iError;
-    }
-    printf("Number of bytes: %d Request content: %d\n", iError, iHeaderSize);
-
-    iError = write(iSocketFd, &header, sizeof(iMsgSizeNBO));
-    if (iError < 0)
-    {
-        printf("Size message not sent, error (%d)\n", iError);
-        return iError;
-    }
-    printf("Number of bytes: %d Request content: %d\n", iError, iMsgSize);
-
-    // Send message
-    iMsgSizeNBO = htonl(iMsgSize);
-    iError = write(iSocketFd, &iMsgSizeNBO, sizeof(iMsgSizeNBO));
-    if (iError < 0)
-    {
-        printf("Size message not sent, error (%d)\n", iError);
-        return iError;
-    }
-    printf("Number of bytes: %d Request content: %d\n", iError, iMsgSize);
-
-    iError = write(iSocketFd, pcBuffer, iMsgSize);
-    if (iError < 0)
-    {
-        printf("Content message not sent, error (%d)\n", iError);
-        return iError;
-    }
-    printf("Number of bytes: %d Message content:\n%s\n", iError, pcBuffer);
-
-    return iError;
-}
-
-int Client::ReceiveACK()
-{
-    int iError = 0;
-    int iACKSize = 0;
-    char* pcACK = nullptr;
-
-    iError = read(iSocketFd, &iACKSize, 4);
-    if (iError < 0 || iACKSize == 0)
-    {
-        printf("ACK message not received");
-        return iError;
-    }
-    printf("Number of bytes: %d Request content: %d\n", iError, ntohl(iACKSize));
-
-    pcACK = (char *) malloc(sizeof(char) * (ntohl(iACKSize) + 1));
-    iError = read(iSocketFd, pcACK, iACKSize);
-    if (iError < 0)
-    {
-        printf("ACK message not received");
-        return iError;
-    }
-
-    printf("Number of bytes: %d Confirmation content:\n%s\n\n", iError, pcACK);
-    free(pcACK);
-    iACKSize = 0;
-    return iError;
-}
-
-int Client::ReceiveMsg()
-{
-    int iError = 0;
-    int iMsgSize = 0;
-    char* pcMsg = nullptr;
-
-    iError = read(iSocketFd, &iMsgSize, 4);
-    if (iError < 0 || iMsgSize == 0)
-    {
-        printf("ACK message not received");
-        return iError;
-    }
-    printf("Number of bytes: %d Request content: %d\n", iError, ntohl(iMsgSize));
-
-    pcMsg = (char *) malloc(sizeof(char) * (ntohl(iMsgSize) + 1));
-    iError = read(iSocketFd, pcMsg, iMsgSize);
-    if (iError < 0)
-    {
-        printf("Message not received");
-        return iError;
-    }
-
-    printf("Number of bytes: %d Message content:\n%s\n\n", iError, pcMsg);
-    free(pcMsg);
-    iMsgSize = 0;
-    return iError;
-}
-
 int Client::ReadMsg(char** ppcMsg, int* piMsgSize)
 {
     int iError = 0;
-    int iMsgSize = 0;
 
     iError = read(iSocketFd, piMsgSize, 4);
     if (iError < 0)

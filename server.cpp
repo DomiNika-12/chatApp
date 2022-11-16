@@ -1,7 +1,3 @@
-//
-// Created by Dominika Bobik on 10/26/22.
-//
-
 #include "server.h"
 
 Server::Server()
@@ -64,7 +60,6 @@ int Server::CreateConnection()
 int Server::ReadMsg(int iConSocketFd, char** ppcMsg, int* piMsgSize)
 {
     int iError = 0;
-    int iMsgSize = 0;
 
     iError = read(iConSocketFd, piMsgSize, 4);
     if (iError < 0)
@@ -95,7 +90,7 @@ int Server::SendMsg(int iConSocketFd, char** ppcMsg, int iMsgSize)
     iError = send(iConSocketFd, *ppcMsg, iMsgSize, 0);
     if (iError < 0)
     {
-        printf("Message content not sent, errno (%d), %s\n", iError, errno, strerror(errno));
+        printf("Message content not sent, errno (%d), %s\n", errno, strerror(errno));
         return iError;
     }
     printf("Message sent: %s\n", (char*) *ppcMsg);
@@ -109,7 +104,6 @@ int Server::GetSocket() {
 
 int Server::GetClientID(int iConSocketFd, IDHeader* pHeader) {
     int iError = 0;
-    int iHeaderSize = 0;
     ClientTable data{};
 
     iError = read(iConSocketFd, pHeader, sizeof(*pHeader));

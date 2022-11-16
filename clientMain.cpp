@@ -4,7 +4,6 @@
 
 #include <thread>
 #include "client.h"
-#include "server.h"
 
 Client* client;
 
@@ -46,18 +45,18 @@ void SendThread()
 int main(int argc, char *argv[]) {
 
     int iError = 0;
-    char* pcMsg = nullptr;
-    int iMsgSize = 0;
-    client = new Client();
+    struct IDHeader header;
 
+    client = new Client();
     iError = client->CreateConnection();
     if (iError != 0)
     {
         exit(EXIT_FAILURE);
     }
 
+    // Get ID from the server
+
     // Construct ID header from user input
-    struct IDHeader header;
     printf("Enter your ID (1 char):\n");
     header.selfID = getc(stdin);
     getc(stdin);
@@ -72,6 +71,7 @@ int main(int argc, char *argv[]) {
         printf("Failed to send a header, errno (%d)\n", errno);
         exit(EXIT_FAILURE);
     }
+
     // Start read and send threads
     std::thread tRead(&ReadThread);
     std::thread tSend(&SendThread);

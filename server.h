@@ -8,25 +8,15 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include "types.h"
 
 #ifndef CHATAPP_SERVER_H
 #define CHATAPP_SERVER_H
 
 #define PORT 49153
-#define ACKMSG "Server: Message received."
 
 using namespace std;
 
-struct ClientTable {
-    char cClientID;
-    char cSelfID;
-    int iSocketFD;
-};
-
-struct IDHeader {
-    char selfID;
-    char clientID;
-};
 class Server {
 private:
     int iSocketFd;

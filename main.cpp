@@ -1,24 +1,25 @@
 #include <iostream>
-#include <cstdio>
 #include <cstdlib>
 #include <thread>
 #include "server.h"
-#include "client.h"
 
 using namespace std;
 
 Server* serv = new Server();
 
-void ThreadMain(sockaddr_in* pConnection, socklen_t* pLen, int iConSocketFd)
+void ThreadMain(int iConSocketFd)
 {
     int iError = 0;
     char* pcMsg = nullptr;
     int iMsgSize = 0;
     int iClientSocketFd = 0;
-    char cSelfID = '\0';
     IDHeader header{};
 
     cout << "Thread ID: " << this_thread::get_id() << " running\n";
+    cout << "Socket: " << iConSocketFd << endl;
+
+    // Send ID to the user
+
     iError = serv->GetClientID(iConSocketFd, &header);
     if (iError < 0)
     {
@@ -44,7 +45,7 @@ void ThreadMain(sockaddr_in* pConnection, socklen_t* pLen, int iConSocketFd)
         {
             exit(EXIT_FAILURE);
         }
-
+        if (iClientSocketFd)
         iError = serv->SendMsg(iClientSocketFd, &pcMsg, iMsgSize);
         if (iError < 0)
         {
@@ -56,6 +57,7 @@ void ThreadMain(sockaddr_in* pConnection, socklen_t* pLen, int iConSocketFd)
 int main()
 {
     int iError = 0;
+
     iError = serv->CreateConnection();
     if (iError != 0)
     {
@@ -64,22 +66,17 @@ int main()
 
     while (1)
     {
-        // accept incoming connections
-        sockaddr_in* connection = (sockaddr_in *)malloc(sizeof(connection));
-        socklen_t len;
+        // Accept incoming connection
+        auto* connection = (sockaddr_in *)malloc(sizeof(sockaddr_in));
+        socklen_t len = 0;
         int iConSocketFd = 0;
         iConSocketFd = accept(serv->GetSocket(), (struct sockaddr *) &connection, &len);
         if (iConSocketFd <= 0)
         {
             exit(EXIT_FAILURE);
         }
-        else
-        {
-            // start a new thread but do not wait for it
-            //threads[i++] =
-            printf("Socket: %d\n", iConSocketFd);
-            thread t3(&ThreadMain, connection, &len, iConSocketFd);
-            t3.detach();
-        }
+
+        thread t(&ThreadMain, iConSocketFd);
+        t.detach();
     }
 }
