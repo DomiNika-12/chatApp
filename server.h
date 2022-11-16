@@ -5,13 +5,28 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <iostream>
+#include <thread>
+#include <vector>
 
 #ifndef CHATAPP_SERVER_H
 #define CHATAPP_SERVER_H
 
-#define PORT 12020
+#define PORT 49153
 #define ACKMSG "Server: Message received."
 
+using namespace std;
+
+struct ClientTable {
+    char cClientID;
+    char cSelfID;
+    int iSocketFD;
+};
+
+struct IDHeader {
+    char selfID;
+    char clientID;
+};
 class Server {
 private:
     int iSocketFd;
@@ -21,9 +36,12 @@ private:
     socklen_t iFromSize;
 public:
     Server();
+    vector<ClientTable> clientData{};
     int CreateConnection();
-    int ReceiveMsg();
-    int SendACK();
+    int GetClientID(int iConSocketFd, IDHeader* pHeader);
+    int SendMsg(int iConSocketFd, char** ppcMsg, int iMsgSize);
+    int ReadMsg(int iConSocketFd, char** ppcMsg, int* piMsgSize);
+    int GetSocket();
 };
 
 #endif //CHATAPP_SERVER_H

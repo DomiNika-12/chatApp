@@ -11,6 +11,7 @@ Server::Server()
     bzero((char *) &serv, iServSize);
     iFromSize = sizeof(from);
     bzero((char *) &from, iFromSize);
+    //clientData = (ClientTable*) malloc(sizeof(ClientTable) * std::thread::hardware_concurrency());
 }
 
 int Server::CreateConnection()
@@ -18,7 +19,7 @@ int Server::CreateConnection()
     int iError = 0;
 
     // Create socket: IPv4 domain, UDP, default protocol
-    iSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
+    iSocketFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (iSocketFd == -1)
     {
         printf("Error while creating socket\n");
@@ -26,13 +27,17 @@ int Server::CreateConnection()
         return iError;
     }
 
+    int opt = 1;
+    setsockopt(iSocketFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+
     serv.sin_family = AF_INET;
     serv.sin_addr.s_addr = htonl(INADDR_ANY);
     serv.sin_port = htons(PORT);
 
     fflush(stdout);
     // Binding socket
-    iError = bind(iSocketFd, (struct sockaddr *) &serv, iServSize);
+    iServSize = sizeof(serv);
+    iError = ::bind(iSocketFd, (struct sockaddr *) &serv, iServSize);
     if (iError < 0)
     {
         printf("Failed to bind the socket\n");
@@ -40,64 +45,84 @@ int Server::CreateConnection()
         return iError;
     }
 
-    iServSize = sizeof(serv);
-    getsockname(iSocketFd, (struct sockaddr *) &serv, (socklen_t *)&iServSize);
+    iError = listen(iSocketFd, 5);
+    if (iError < 0)
+    {
+        printf("Failed to listen on the socket\n");
+        close(iSocketFd);
+        return iError;
+    }
 
     printf("Server running\n");
     printf("Port:       %d (network byte order)\n", serv.sin_port);
     printf("            %d (hostorder)\n", PORT);
     printf("Domain:     AF_INET\n");
-    printf("Protocol:   UDP\n\n");
+    printf("Protocol:   TCP\n\n");
     return iError;
 }
 
-int Server::ReceiveMsg()
-{
-    int iMsgSize = 0;
-    char* pcMsg = nullptr;
-    int iRecvBytes = 0;
-    char* pcIP = nullptr;
-
-    pcIP = (char*) malloc(15);
-    iRecvBytes = recvfrom(iSocketFd, &iMsgSize, 4, 0, (struct sockaddr *) &from, &iFromSize);
-    printf("Server got request\n");
-    inet_ntop(AF_INET, &(from.sin_addr), pcIP,15);
-    printf("IP: %s\n", pcIP);
-    printf("Number of bytes: %d\n Request content:\n%d\n", iRecvBytes, ntohl(iMsgSize));
-
-    pcMsg = (char *) malloc(sizeof(char) * (ntohl(iMsgSize) + 1));
-    iRecvBytes = recvfrom(iSocketFd, (char *) pcMsg, iMsgSize, 0, (struct sockaddr *) &from, &iFromSize);
-    printf("Number of bytes: %d\n Message content:\n%s\n", iRecvBytes, pcMsg);
-
-    free(pcIP);
-    free(pcMsg);
-}
-
-int Server::SendACK()
+int Server::ReadMsg(int iConSocketFd, char** ppcMsg, int* piMsgSize)
 {
     int iError = 0;
-    char* pcACKMsg = nullptr;
-    int iACKMsgSize = 0;
-    int iACKMsgSizeNBO = 0;
+    int iMsgSize = 0;
 
-    pcACKMsg = (char*) ACKMSG;
-    iACKMsgSize = strlen(pcACKMsg);
-    iACKMsgSizeNBO = htonl(iACKMsgSize);
-
-    iError = sendto(iSocketFd, &iACKMsgSizeNBO, sizeof(pcACKMsg), 0, (struct sockaddr *)&from, iFromSize);
+    iError = read(iConSocketFd, piMsgSize, 4);
     if (iError < 0)
     {
-        printf("Size message not sent, error (%d), errno (%d)\n", iError, errno);
-        return iError;
+        printf("Read failed\n");
     }
-    printf("Sending ACK length <%d> (network byte order) <%d> (host byte order)\n", htonl(iACKMsgSize), iACKMsgSize);
 
-    iError = sendto(iSocketFd, pcACKMsg, iACKMsgSize, 0, (struct sockaddr  *)&from, iFromSize);
+    *ppcMsg = (char *) malloc(sizeof(char) * (ntohl(*piMsgSize) + 1));
+    read(iConSocketFd, *ppcMsg, *piMsgSize);
     if (iError < 0)
     {
-        printf("ACK message not sent, error (%d), errno (%d)\n", iError, errno);
+        printf("Read failed\n");
+    }
+}
+
+int Server::SendMsg(int iConSocketFd, char** ppcMsg, int iMsgSize)
+{
+    int iError = 0;
+
+    iError = send(iConSocketFd, &iMsgSize, 4, 0);
+    if (iError < 0)
+    {
+        printf("Size of the message not sent, errno (%d), %s\n", iError, errno, strerror(errno));
         return iError;
     }
+    printf("Size of the message sent: %d\n", iMsgSize);
+
+    iError = send(iConSocketFd, *ppcMsg, iMsgSize, 0);
+    if (iError < 0)
+    {
+        printf("Message content not sent, errno (%d), %s\n", iError, errno, strerror(errno));
+        return iError;
+    }
+    printf("Message sent: %s\n", (char*) *ppcMsg);
 
     return iError;
 }
+
+int Server::GetSocket() {
+    return iSocketFd;
+}
+
+int Server::GetClientID(int iConSocketFd, IDHeader* pHeader) {
+    int iError = 0;
+    int iHeaderSize = 0;
+    ClientTable data{};
+
+    iError = read(iConSocketFd, pHeader, sizeof(*pHeader));
+    if (iError < 0)
+    {
+        printf("Read of clientID failed\n");
+    }
+
+    data.cClientID = pHeader->clientID;
+    data.cSelfID = pHeader->selfID;
+    data.iSocketFD = iConSocketFd;
+    clientData.push_back(data);
+
+    return 0;
+}
+
